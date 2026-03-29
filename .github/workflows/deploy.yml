@@ -1,0 +1,49 @@
+name: Deploy NOETICA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install
+      - name: Build with env vars
+        run: npm run build
+        env:
+          VITE_AI_API_KEY:            ${{ secrets.VITE_AI_API_KEY }}
+          VITE_AI_MODEL:              Hermes-4-70B
+          VITE_AI_ENDPOINT:           https://inference-api.nousresearch.com/v1/chat/completions
+          VITE_AI_MAX_TOKENS:         512
+          VITE_AI_TEMPERATURE:        0.8
+          VITE_COTI_CHAIN_ID:         7082400
+          VITE_COTI_RPC_URL:          https://testnet.coti.io/rpc
+          VITE_COTI_EXPLORER:         https://testnet.cotiscan.io
+          VITE_COTI_FAUCET:           https://faucet.coti.io
+          VITE_NOET_TOKEN_ADDRESS:    ${{ secrets.VITE_NOET_TOKEN_ADDRESS }}
+          VITE_NOET_REWARDS_ADDRESS:  ${{ secrets.VITE_NOET_REWARDS_ADDRESS }}
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - uses: actions/deploy-pages@v4
+        id: deployment

@@ -1,0 +1,42 @@
+{
+  "name": "NOETICA Dev",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "features": {},
+  "forwardPorts": [5173, 4173, 8545],
+  "portsAttributes": {
+    "5173": {
+      "label": "NOETICA App",
+      "onAutoForward": "openBrowser"
+    },
+    "8545": {
+      "label": "Hardhat Local Node"
+    }
+  },
+  "postCreateCommand": "npm install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "NomicFoundation.hardhat-solidity",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "dbaeumer.vscode-eslint",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.tabSize": 2,
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "files.exclude": {
+          "node_modules": true,
+          "dist": true,
+          "artifacts": true,
+          "cache": true
+        }
+      }
+    }
+  },
+  "remoteEnv": {
+    "NODE_ENV": "development"
+  }
+}
