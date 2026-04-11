@@ -739,7 +739,7 @@ body{background:#020206;color:#fff;font-family:'DM Sans',system-ui,sans-serif}
         <div id="wlt-addr-wrap" style="display:none"><div class="wlt-addr-show" id="wlt-addr-disp"></div></div>
         <div style="display:flex;gap:8px">
           <button style="padding:11px 16px;border-radius:40px;background:transparent;border:1px solid var(--b1);color:var(--s3);font-family:var(--fb);font-size:13px;cursor:pointer" onclick="ONB.back1()">← Back</button>
-          <button class="btn-next" id="st2-btn" onclick="ONB.connectAndEnter()">Connect Wallet <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+          <button class="btn-next" id="st2-btn" onclick="ONB.handleEnterBtn()">Connect Wallet <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
         </div>
       </div>
     </div>
@@ -1073,33 +1073,55 @@ const ONB = {
     document.getElementById('st2').style.display='none'
     document.getElementById('st1').style.display='block'
   },
+  handleEnterBtn(){
+    const btn=document.getElementById('st2-btn')
+    if(btn && btn.dataset.ready==='1') ONB.finishEnter()
+    else ONB.connectAndEnter()
+  },
   async connectAndEnter(){
     const btn=document.getElementById('st2-btn')
+    // If already connected (returning user), go straight to app
+    if(S.address && S.vaultKey){
+      btn.textContent='Entering...'; btn.disabled=true
+      await ONB.finishEnter()
+      return
+    }
     btn.textContent='Connecting...'; btn.disabled=true
     try {
       const addr=await _connectWallet()
       S.address=addr
       const vk=await deriveVaultKey(addr)
       S.vaultKey=vk
-      const existing=await loadVault(addr,vk)
-      if(existing&&!S.name) S.name=S.name||''
+      await loadVault(addr,vk)
+      if(!S.name) S.name=''
       document.getElementById('wlt-connect-card').style.display='none'
       document.getElementById('wlt-addr-wrap').style.display='block'
       document.getElementById('wlt-addr-disp').textContent=`Connected: ${shortAddr(addr)}`
-      btn.textContent='Enter NOETICA →'; btn.disabled=false
-      btn.onclick=()=>ONB.finishEnter()
+      btn.textContent='Enter NOETICA →'
+      btn.disabled=false
+      btn.dataset.ready='1'
     } catch(e) {
       btn.textContent='Connect Wallet'; btn.disabled=false
       toast(e.code===4001?'Connection rejected':e.message||'Could not connect','err')
     }
   },
   async finishEnter(){
-    await saveVault()
-    APP.init()
-    UI.goto('s-app')
-    const c=isConnected()
-    document.getElementById('chat-gate').style.display=c?'none':'flex'
-    if(c){ const btn=document.getElementById('wlt-btn'); btn.textContent=shortAddr(S.address); btn.classList.add('on') }
+    const btn=document.getElementById('st2-btn')
+    if(btn){ btn.textContent='Entering...'; btn.disabled=true }
+    try {
+      await saveVault()
+      APP.init()
+      UI.goto('s-app')
+      const c=isConnected()
+      document.getElementById('chat-gate').style.display=c?'none':'flex'
+      if(c){
+        const wb=document.getElementById('wlt-btn')
+        if(wb){ wb.textContent=shortAddr(S.address); wb.classList.add('on') }
+      }
+    } catch(e) {
+      console.error('finishEnter error:', e)
+      if(btn){ btn.textContent='Enter NOETICA →'; btn.disabled=false }
+    }
   }
 }
 
