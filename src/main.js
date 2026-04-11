@@ -92,7 +92,10 @@ async function loadVault(address, vaultKey) {
     const d = JSON.parse(await decryptData(raw, vaultKey))
     S.name=d.name||''; S.messages=d.messages||[]; S.moods=d.moods||[]
     S.entries=d.entries||[]; S.streak=d.streak||0; S.bestStreak=d.bestStreak||0
-    S.noet=d.noet||0; S.totalEarned=d.totalEarned||0; S.transactions=d.transactions||[]
+    // Always take the higher value to prevent reward loss
+    S.noet=Math.max(S.noet||0, d.noet||0)
+    S.totalEarned=Math.max(S.totalEarned||0, d.totalEarned||0)
+    S.transactions=d.transactions||[]
     S.journaledToday=S.entries.some(e=>new Date(e.ts).toDateString()===new Date().toDateString())
     return true
   } catch { return false }
@@ -1123,8 +1126,18 @@ const ONB = {
   },
   handleEnterBtn(){
     const btn=document.getElementById('st2-btn')
-    if(btn && btn.dataset.ready==='1') ONB.finishEnter()
-    else ONB.connectAndEnter()
+    // If address AND vaultKey both set, go straight to app
+    if(S.address && S.vaultKey) {
+      ONB.finishEnter()
+    } else if(btn && btn.dataset.ready==='1') {
+      // Wallet connected, derive key and enter
+      deriveVaultKey(S.address).then(vk=>{
+        S.vaultKey=vk
+        loadVault(S.address,vk).then(()=>ONB.finishEnter())
+      }).catch(()=>ONB.finishEnter())
+    } else {
+      ONB.connectAndEnter()
+    }
   },
   async connectAndEnter(){
     const btn=document.getElementById('st2-btn')
@@ -1148,6 +1161,12 @@ const ONB = {
       btn.textContent='Enter NOETICA →'
       btn.disabled=false
       btn.dataset.ready='1'
+      // Auto-proceed after 300ms if still on step 2
+      setTimeout(()=>{
+        if(btn.dataset.ready==='1' && document.getElementById('st2')?.style.display!=='none'){
+          ONB.finishEnter()
+        }
+      },300)
     } catch(e) {
       btn.textContent='Connect Wallet'; btn.disabled=false
       toast(e.code===4001?'Connection rejected':e.message||'Could not connect','err')
@@ -1245,20 +1264,19 @@ const APP = {
   },
   disconnect(){
     document.getElementById('wlt-dropdown').classList.remove('open')
-    // Reset state
-    S.address=null; S.vaultKey=''; S.messages=[]; S.moods=[]; S.entries=[]
-    S.noet=0; S.totalEarned=0; S.transactions=[]; S.streak=0
+    // Save vault before clearing session
+    saveVault().catch(()=>{})
+    // Only clear session - NOT rewards (rewards stay in localStorage)
+    S.address=null; S.vaultKey=''; S.messages=[]
     // Reset UI
     const btn=document.getElementById('wlt-btn')
     btn.textContent='Connect Wallet'; btn.classList.remove('on')
     document.getElementById('top-bal').textContent='0'
     document.getElementById('big-bal').textContent='0'
     document.getElementById('chat-gate').style.display='flex'
-    // Reset wallet state
     try{ if(window.ethereum?.removeAllListeners) window.ethereum.removeAllListeners() }catch{}
-    toast('Disconnected')
-    // Go back to landing
-    setTimeout(()=>UI.goto('s-land'),500)
+    toast('Disconnected successfully')
+    setTimeout(()=>UI.goto('s-land'),600)
   },
   updReward(){
     const s=S.streak
