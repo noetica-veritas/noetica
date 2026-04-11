@@ -221,9 +221,40 @@ body{background:#020206;color:#fff;font-family:'DM Sans',system-ui,sans-serif}
 .coti-badge{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;background:rgba(0,229,200,.07);border:1px solid rgba(0,229,200,.13);font-family:var(--fm);font-size:10px;color:var(--teal);letter-spacing:.07em}
 .coti-dot{width:5px;height:5px;border-radius:50%;background:var(--teal);box-shadow:0 0 6px var(--teal);animation:blink 2s infinite}
 .noet-chip{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;background:var(--b0);border:1px solid var(--b1);font-family:var(--fm);font-size:11px;color:var(--s4)}
-.wlt-btn{padding:5px 13px;border-radius:20px;background:transparent;border:1px solid var(--b2);color:var(--s3);font-family:var(--fb);font-size:11px;font-weight:500;cursor:pointer;transition:all .2s;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wlt-btn{padding:5px 13px;border-radius:20px;background:transparent;border:1px solid var(--b2);color:var(--s3);font-family:var(--fb);font-size:11px;font-weight:500;cursor:pointer;transition:all .2s;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:relative}
 .wlt-btn:hover{border-color:var(--b3);color:#fff}
 .wlt-btn.on{border-color:rgba(0,229,200,.25);color:var(--teal);background:rgba(0,229,200,.05)}
+.wlt-btn.on:hover{background:rgba(0,229,200,.1);border-color:rgba(0,229,200,.4)}
+#wlt-dropdown{
+  position:absolute;top:calc(100% + 8px);right:0;z-index:999;
+  background:#0d0d18;border:1px solid rgba(255,255,255,.1);
+  border-radius:14px;padding:6px;min-width:200px;
+  box-shadow:0 20px 60px rgba(0,0,0,.8);
+  display:none;
+  animation:dropIn .18s cubic-bezier(.16,1,.3,1);
+}
+#wlt-dropdown.open{display:block}
+@keyframes dropIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.wlt-dd-addr{
+  padding:10px 12px;
+  font-family:var(--fm);font-size:11px;color:rgba(0,229,200,.7);
+  letter-spacing:.04em;border-bottom:1px solid rgba(255,255,255,.07);
+  margin-bottom:4px;display:flex;align-items:center;gap:7px;
+}
+.wlt-dd-dot{width:6px;height:6px;border-radius:50%;background:#00e5c8;box-shadow:0 0 6px #00e5c8;flex-shrink:0}
+.wlt-dd-btn{
+  width:100%;padding:9px 12px;
+  background:none;border:none;
+  font-family:var(--fb);font-size:12px;font-weight:500;
+  border-radius:9px;cursor:pointer;
+  display:flex;align-items:center;gap:8px;
+  transition:background .15s;text-align:left;
+}
+.wlt-dd-btn:hover{background:rgba(255,255,255,.05)}
+.wlt-dd-btn.danger{color:#f87171}
+.wlt-dd-btn.danger:hover{background:rgba(248,113,113,.08)}
+.wlt-dd-btn.info{color:var(--s3)}
+.wlt-dd-icon{width:14px;height:14px;opacity:.6}
 
 /* Wallet gate */
 .gate{position:absolute;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(2,2,6,.94);backdrop-filter:blur(16px)}
@@ -758,7 +789,24 @@ body{background:#020206;color:#fff;font-family:'DM Sans',system-ui,sans-serif}
     </div>
     <div class="tbr">
       <div class="noet-chip">◈ <span id="top-bal">0</span> <span style="color:var(--s0)">NOET</span></div>
-      <button class="wlt-btn" id="wlt-btn" onclick="APP.connectWallet()">Connect Wallet</button>
+      <div style="position:relative">
+      <button class="wlt-btn" id="wlt-btn" onclick="APP.wltBtnClick()">Connect Wallet</button>
+      <div id="wlt-dropdown">
+        <div class="wlt-dd-addr"><div class="wlt-dd-dot"></div><span id="wlt-dd-addr-txt">—</span></div>
+        <button class="wlt-dd-btn info" onclick="APP.copyAddr()">
+          <svg class="wlt-dd-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy Address
+        </button>
+        <button class="wlt-dd-btn info" onclick="APP.viewExplorer()">
+          <svg class="wlt-dd-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          View on Explorer
+        </button>
+        <button class="wlt-dd-btn danger" onclick="APP.disconnect()">
+          <svg class="wlt-dd-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Disconnect
+        </button>
+      </div>
+    </div>
     </div>
   </div>
 
@@ -1117,6 +1165,8 @@ const ONB = {
       if(c){
         const wb=document.getElementById('wlt-btn')
         if(wb){ wb.textContent=shortAddr(S.address); wb.classList.add('on') }
+        const addrTxt=document.getElementById('wlt-dd-addr-txt')
+        if(addrTxt) addrTxt.textContent=S.address||''
       }
     } catch(e) {
       console.error('finishEnter error:', e)
@@ -1157,6 +1207,8 @@ const APP = {
       if(!S.vaultKey){ S.vaultKey=await deriveVaultKey(addr); await loadVault(addr,S.vaultKey) }
       const btn=document.getElementById('wlt-btn')
       btn.textContent=shortAddr(addr); btn.classList.add('on')
+      const addrTxt=document.getElementById('wlt-dd-addr-txt')
+      if(addrTxt) addrTxt.textContent=addr
       document.getElementById('chat-gate').style.display='none'
       toast(`Connected: ${shortAddr(addr)}`)
       const bal=await getNOETBalance(addr)
@@ -1170,6 +1222,43 @@ const APP = {
     document.getElementById('top-bal').textContent=S.noet.toLocaleString()
     document.getElementById('big-bal').textContent=S.noet.toLocaleString()
     REWARDS.renderTx()
+  },
+  wltBtnClick(){
+    if(!isConnected()){ APP.connectWallet(); return }
+    const dd=document.getElementById('wlt-dropdown')
+    const addrTxt=document.getElementById('wlt-dd-addr-txt')
+    if(addrTxt) addrTxt.textContent=S.address||shortAddr(S.address)
+    dd.classList.toggle('open')
+    // Close on outside click
+    setTimeout(()=>{
+      const close=()=>{dd.classList.remove('open');document.removeEventListener('click',close)}
+      document.addEventListener('click',close)
+    },10)
+  },
+  copyAddr(){
+    if(S.address) navigator.clipboard.writeText(S.address).then(()=>toast('Address copied')).catch(()=>{})
+    document.getElementById('wlt-dropdown').classList.remove('open')
+  },
+  viewExplorer(){
+    if(S.address) window.open(`https://testnet.cotiscan.io/address/${S.address}`,'_blank')
+    document.getElementById('wlt-dropdown').classList.remove('open')
+  },
+  disconnect(){
+    document.getElementById('wlt-dropdown').classList.remove('open')
+    // Reset state
+    S.address=null; S.vaultKey=''; S.messages=[]; S.moods=[]; S.entries=[]
+    S.noet=0; S.totalEarned=0; S.transactions=[]; S.streak=0
+    // Reset UI
+    const btn=document.getElementById('wlt-btn')
+    btn.textContent='Connect Wallet'; btn.classList.remove('on')
+    document.getElementById('top-bal').textContent='0'
+    document.getElementById('big-bal').textContent='0'
+    document.getElementById('chat-gate').style.display='flex'
+    // Reset wallet state
+    try{ if(window.ethereum?.removeAllListeners) window.ethereum.removeAllListeners() }catch{}
+    toast('Disconnected')
+    // Go back to landing
+    setTimeout(()=>UI.goto('s-land'),500)
   },
   updReward(){
     const s=S.streak
