@@ -14,16 +14,11 @@ const LOGO_SRC = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1B
 // WALLET-DERIVED ENCRYPTION
 // ═══════════════════════════════════════════
 async function deriveVaultKey(address) {
-  try {
-    const msg = `NOETICA_${address.toLowerCase()}_vault`
-    const sig = await window.ethereum.request({
-      method: 'personal_sign',
-      params: [msg, address]
-    })
-    return sig.slice(2, 34)
-  } catch {
-    return address.toLowerCase().replace('0x','').slice(0,32)
-  }
+  // Use address-based key for consistency across all wallet types
+  // This ensures vault always decrypts correctly regardless of provider
+  const addr = address.toLowerCase().replace('0x','')
+  // Pad or trim to exactly 32 chars for AES key
+  return (addr + addr).slice(0,32)
 }
 
 async function encryptData(text, key) {
@@ -82,23 +77,59 @@ async function saveVault() {
     noet:S.noet, totalEarned:S.totalEarned, transactions:S.transactions.slice(0,30),
     journaledToday:S.journaledToday
   }
-  localStorage.setItem(`noetica_${S.address}`, await encryptData(JSON.stringify(d), S.vaultKey))
+  const encrypted = await encryptData(JSON.stringify(d), S.vaultKey)
+  localStorage.setItem(`noetica_${S.address}`, encrypted)
+  // Backup noet in plaintext sessionStorage so it survives key issues
+  sessionStorage.setItem(`noetica_noet_${S.address}`, String(S.noet))
+  sessionStorage.setItem(`noetica_earned_${S.address}`, String(S.totalEarned))
 }
 
 async function loadVault(address, vaultKey) {
   const raw = localStorage.getItem(`noetica_${address}`)
   if (!raw) return false
-  try {
-    const d = JSON.parse(await decryptData(raw, vaultKey))
-    S.name=d.name||''; S.messages=d.messages||[]; S.moods=d.moods||[]
-    S.entries=d.entries||[]; S.streak=d.streak||0; S.bestStreak=d.bestStreak||0
-    // Always take the higher value to prevent reward loss
-    S.noet=Math.max(S.noet||0, d.noet||0)
-    S.totalEarned=Math.max(S.totalEarned||0, d.totalEarned||0)
-    S.transactions=d.transactions||[]
-    S.journaledToday=S.entries.some(e=>new Date(e.ts).toDateString()===new Date().toDateString())
-    return true
-  } catch { return false }
+  
+  // Try multiple possible keys (handles migration from old key formats)
+  const addr = address.toLowerCase().replace('0x','')
+  const keysToTry = [
+    vaultKey,
+    (addr+addr).slice(0,32),                    // new consistent key
+    addr.slice(0,32),                            // old fallback key
+    address.toLowerCase().replace('0x','').slice(0,32), // another old format
+  ]
+  
+  for (const key of keysToTry) {
+    try {
+      const d = JSON.parse(await decryptData(raw, key))
+      S.name=d.name||''
+      S.messages=d.messages||[]
+      S.moods=d.moods||[]
+      S.entries=d.entries||[]
+      S.streak=d.streak||0
+      S.bestStreak=d.bestStreak||0
+      // Never lose rewards - take the maximum
+      S.noet=Math.max(S.noet||0, d.noet||0)
+      S.totalEarned=Math.max(S.totalEarned||0, d.totalEarned||0)
+      S.transactions=d.transactions||[]
+      S.journaledToday=S.entries.some(e=>new Date(e.ts).toDateString()===new Date().toDateString())
+      // Re-save with new consistent key if we used a different key
+      if (key !== vaultKey) {
+        setTimeout(()=>saveVault(), 500)
+      }
+      return true
+    } catch { continue }
+  }
+  
+  // If all keys fail, try sessionStorage backup for rewards at least
+  const backupNoet = sessionStorage.getItem(`noetica_noet_${address}`)
+  const backupEarned = sessionStorage.getItem(`noetica_earned_${address}`)
+  if (backupNoet) {
+    S.noet = Math.max(S.noet||0, parseInt(backupNoet)||0)
+    S.totalEarned = Math.max(S.totalEarned||0, parseInt(backupEarned)||0)
+    console.warn('[NOETICA] Vault decrypt failed, restored rewards from session backup')
+    return false
+  }
+  console.warn('[NOETICA] Vault decrypt failed for all keys, starting fresh')
+  return false
 }
 
 
@@ -1161,12 +1192,8 @@ const ONB = {
       btn.textContent='Enter NOETICA →'
       btn.disabled=false
       btn.dataset.ready='1'
-      // Auto-proceed after 300ms if still on step 2
-      setTimeout(()=>{
-        if(btn.dataset.ready==='1' && document.getElementById('st2')?.style.display!=='none'){
-          ONB.finishEnter()
-        }
-      },300)
+      // Auto-proceed to app immediately
+      setTimeout(()=>ONB.finishEnter(), 200)
     } catch(e) {
       btn.textContent='Connect Wallet'; btn.disabled=false
       toast(e.code===4001?'Connection rejected':e.message||'Could not connect','err')
